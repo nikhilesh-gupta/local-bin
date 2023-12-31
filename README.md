@@ -7,6 +7,7 @@ Welcome to the `local-bin` repository! This collection contains essential script
 Open your terminal and run the following command to clone the repository:
 
 ```bash
+cd ~
 git clone https://github.com/nikhilesh-gupta/local-bin
 ```
 
