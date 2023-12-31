@@ -1,0 +1,93 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# HELP | Checks if the Input is NULL
+if [[ $1 = '-h' ]] || [[ -z $1 ]]
+then
+        echo "[+]Syntax for tool SUBTO{Subdomain-TakeOver} is defined below";
+        echo "   -> subto -f <file.txt>";
+        echo "   -> subto -d <domain.com>";
+        printf "${BLUE}[#]Note: The file should have the list of subdomains\{sub.example.com\} seperated with next line${NC}\n";
+        printf "${BLUE}[#]Description: The tool will check if the provided subdomains have any probability for takeover attacks${NC}\n";
+
+        exit 0;
+fi;
+
+#Code for the list of domains!!
+if [ $1 = '-f' ]
+then
+        if [ ! -f $2 ]
+        then
+                echo "[!]File doesn't exists. Please check the path again"
+
+                exit 20;
+        fi;
+        allDomains=`cat $2`;
+
+        echo "[+]Input file - $2";
+        echo "[+]Target Details - $allDomains";
+        date;
+
+        for subdomain in `cat $2`; do
+                cname=$(dig CNAME $subdomain | grep CNAME | grep -e azure -e aws);
+                if [[ ! -z $cname ]]
+                then
+                        record=$(echo $cname | awk '{ print $NF }');
+                        #echo $record;
+                        status=$(dig CNAME $record | grep status: | cut -d "," -f2);
+                        #echo $status;
+                        if [[ $status="status: NXDOMAIN" ]]
+                        then
+                                echo "[+]Asset: $2 | CNAME $record |$status | Possible Subdomain Takeover";
+                        else
+                                echo "[-]Asset: $2 | CNAME $record |$status | Takeover (might) Not Possible";
+                        fi;
+                else
+                        echo "[!]CNAME doesn't exists for $2";
+        fi;
+        done;
+
+#Code for a single domain!!
+elif [ $1 = '-d' ]
+then
+        if [ -z $2 ]
+        then
+                echo "[!]No Domain was entered!!! Please use '-h' for help"
+                exit 20;
+        fi;
+
+        echo "[+]Target Domain - $2";
+        date;
+
+        #progress=1;
+        cname=$(dig CNAME $2 | grep CNAME | grep -e azure -e aws);
+        if [[ ! -z $cname ]]
+        then
+                record=$(echo $cname | awk '{ print $NF }');
+                #echo $record;
+                status=$(dig CNAME $record | grep status: | cut -d "," -f2);
+                #echo $status;
+                if [[ $status="status: NXDOMAIN" ]]
+                then
+                        echo "[+]Asset: $2 | CNAME $record |$status | Possible Subdomain Takeover";
+                else
+                        echo "[-]Asset: $2 | CNAME $record |$status | Takeover (might) Not Possible";
+                fi;
+        else
+                echo "[!]CNAME doesn't exists for $2";
+        fi;
+
+        #       echo -en "[<=>]Progress : $((11*$progress))%";
+        #       progress=$progress+1;
+
+
+#Checks if the inputed value is incorrect!!
+else
+        echo "[!]Please give valid input";
+        echo "";
+        echo "[+]Use the syntax defined below";
+        echo "   -> subto -f <file.txt>";
+        echo "   -> subto -d <domain.com>";
+
+        exit 10;
+fi;

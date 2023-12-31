@@ -1,0 +1,69 @@
+#!/usr/bin/python3
+# Written by Nikhilesh Gupta, December 2023
+
+import ipaddress
+import sys
+
+# Define color codes
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+BLUE = '\033[94m'
+RESET = '\033[0m'
+
+def print_help():
+    print("[+]Syntax for tool ip2netv{IP-to-Netblock-Validation} is defined below")
+    print("   ->ip2netv")
+    print(BLUE+"[#]Note: The two input files should have the list of IPs and netblocks seperated with next line respectively"+RESET)
+    print(BLUE+"[#]Description: The script takes file as an input which contains a list of IPs and validate if it have the respective netblocks or not and give output according to the option choosed"+RESET)
+    sys.exit(0)
+
+# Check for command-line arguments
+if len(sys.argv) > 1:
+    arg = sys.argv[1]
+    if arg in ['-h', '--help']:
+        print_help()
+
+def check_ips_in_netblocks(ip_list, netblock_list):
+    ips_in_netblocks = []
+    ips_not_in_netblocks = []
+
+    # Convert the netblock strings to ipaddress.IPv4Network or ipaddress.IPv6Network objects
+    netblocks = [ipaddress.ip_network(netblock, strict=False) for netblock in netblock_list]
+
+    for ip in ip_list:
+        ip_obj = ipaddress.ip_address(ip)
+        if any(ip_obj in netblock for netblock in netblocks):
+            ips_in_netblocks.append(ip)
+        else:
+            ips_not_in_netblocks.append(ip)
+
+    return ips_in_netblocks, ips_not_in_netblocks
+
+if __name__ == "__main__":
+    # Take file input
+    ip_file = input("Enter the IPs file path: ")
+    netblock_file = input("Enter the Netblock file path: ")
+
+    # Read a list of IP addresses from a text file
+    with open(ip_file, "r") as ip_file:
+        ip_list = [line.strip() for line in ip_file]
+
+    # Read a list of netblocks from a text file
+    with open(netblock_file, "r") as netblock_file:
+        netblock_list = [line.strip() for line in netblock_file]
+
+    ips_in_netblocks, ips_not_in_netblocks = check_ips_in_netblocks(ip_list, netblock_list)
+
+    choice = input("Do you want to see IPs attributed to netblocks (1) or IPs not present on netblocks (2)? Enter 1 or 2: ")
+
+    if choice == "1":
+        print("IPs attributed to the specified netblocks:")
+        for ip in ips_in_netblocks:
+            print(ip)
+    elif choice == "2":
+        print("IPs not present on the specified netblocks:")
+        for ip in ips_not_in_netblocks:
+            print(ip)
+    else:
+        print("Invalid choice. Please enter 1 or 2.")

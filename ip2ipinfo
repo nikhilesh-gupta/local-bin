@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+# Written by Gautam Bhattathiri and Nikhilesh Gupta, December 2023
+
+import csv
+import requests
+import os
+import sys
+
+# Define color codes
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+BLUE = '\033[94m'
+RESET = '\033[0m'
+
+
+def print_help():
+    print("[+]Syntax for tool ip2ipinfo{IP-to-IPINFO-Details} is defined below")
+    print("   ->ip2ipinfo")
+    print(BLUE+"[#]Note: The input file should have the list of IPs seperated with next line"+RESET)
+    print(BLUE+"[#]Description: The script takes file as an input which contains a list of IPs and fetch relevant data from the IPINFO"+RESET)
+    sys.exit(0)
+
+# Check for command-line arguments
+if len(sys.argv) > 1:
+    arg = sys.argv[1]
+    if arg in ['-h', '--help']:
+        print_help()
+
+# Loading the .env file on the environment
+ENV_FILE_PATH = os.path.join(os.environ['HOME'], 'local-bin', '.env')
+# If want to add the IPINFO Keys directly - comment the above line and add this code snippet below it : ENV_FILE_PATH = "<IPINFO_TOKEN>"
+# Put the IPINFO token in place of its placeholder -> <IPINFO_TOKEN>
+
+if not os.path.exists(ENV_FILE_PATH):
+    print("[-]Error: .env file not found!!")
+    print("[!]Modify the variable 'ENV_FILE_PATH' with your .env file path in the script")
+    sys.exit(1)
+else:
+    with open(ENV_FILE_PATH) as f:
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip()
+            if line.startswith("#") or not line:
+                # Ignore comments and empty lines
+                continue
+            key, value = line.split("=", 1)
+            os.environ[key] = value
+
+# Check if IPINFO TOKEN exists
+ipinfo_token = os.environ.get('ipinfo_token')
+if ipinfo_token is None or ipinfo_token == "":
+    print("[-]Error: The IPINFO TOKEN environment variable is not set")
+    print("[!]Configure IPINFO TOKEN in the .env file present on 'local-bin' directory before running this script")
+    exit(1)
+
+INPUT_FILE = input("Enter the input file name: ")
+OUTPUT_FILE = input("Enter the output file name: ")
+
+ip_list = []
+
+# Reading the IPs from the input file
+with open(INPUT_FILE, 'r') as csvfile:
+    reader = csv.reader(csvfile)
+    for row in reader:
+        ip_list.append(row[0])
+
+# Saving the output
+with open(OUTPUT_FILE, 'w', newline='') as csvfile:
+    fieldnames = ['ip', 'asn', 'asn_org', 'asn_org_domain', 'company_name', 'company_domain', 'company_type', 'netblock']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for ip in ip_list:
+        url = "https://ipinfo.io/" + ip + "/json?token=" + ipinfo_token
+        response = requests.get(url)
+        data = response.json()
+        
+        # Fetching specific information from IPINFO
+        asn = data["asn"]["asn"] if "asn" in data else "None"
+        asn_org = data["asn"]["name"] if "asn" in data else "None"
+        asn_org_domain = data["asn"]["domain"] if "asn" in data else "None"
+        company_name = data["company"]["name"] if "company" in data else "None"
+        company_domain = data["company"]["domain"] if "company" in data else "None"
+        company_type = data["company"]["type"] if "company" in data else "None"
+        netblock = data["abuse"]["network"] if "abuse" in data else "None"
+        
+        writer.writerow({
+            'ip': ip,
+            'asn': asn,
+            'asn_org': asn_org,
+            'asn_org_domain': asn_org_domain,
+            'company_name': company_name,
+            'company_domain': company_domain,
+            'company_type': company_type,
+            'netblock': netblock
+            })

@@ -1,0 +1,49 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# HELP | Checks if the Input is NULL
+if [[ $1 = '-h' ]] || [[ -z $1 ]]
+then
+        echo "[+]Syntax for tool IP2PTR{IP-Address to PTR Record} is defined below";
+        echo "   -> ip2ptr <file.txt>";
+        echo "   -> ip2ptr -i <IP-address>";
+		printf "${BLUE}[#]Note: The file should have the list of IPs seperated with next line${NC}\n";
+        printf "${BLUE}[#]Description: The tool will find the PTR records and gives output in CSV format which needs to be saved either using redirection '>' or 'tee' command${NC}\n";
+
+        exit 3;
+fi;
+
+#For Single IP
+elif [ $1 = '-i' ]
+then
+	dig=$(dig -x $2 | grep -o "PTR.*" | tail -n 1);
+	check=$(echo $dig | awk -s '{ printf $NF }')
+	if [[ "PTR" == $check ]]
+	then
+        	echo "$2,no ptr record found";
+	else
+        	echo "$2,$check";
+	fi;
+
+	exit 0;
+fi;
+
+
+#For Files - default behaviour
+for ip in `cat $1`; do
+	dig=$(dig -x $ip | grep -o "PTR.*" | tail -n 1);
+	
+	check=$(echo $dig | awk -s '{ printf $NF }')
+	if [[ "PTR" == $check ]]
+	then
+		echo "$ip,no ptr record found";
+	else
+		echo "$ip,$check";
+	fi;
+done;

@@ -1,0 +1,73 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# HELP | Checks if the Input is NULL
+if [[ $1 = '-h' ]] || [[ -z $1 ]]
+then
+        echo "[+]Syntax for tool NETNAMEINFO{NETWORK-NAME-INFORMATION} is defined below";
+        echo "   -> netnameinfo <file.txt>";
+		printf "${BLUE}[#]Note: The file should have the list of URLs from networksdb.io which contains CIDR ranges and seperated with next line. Use 'Organisation Lookup' feature in networksdb.io to find such URLs${NC}\n";
+		printf "${BLUE}[#]Example: https://networksdb.io/ip-addresses-of/google-ltd${NC}\n";
+        printf "${BLUE}[#]Description: The tool will gather CIDR ranges from networksdb.io URLs provided and fetch netname information using RIPE database and gives output in CSV format which needs to be saved either using redirection '>' or 'tee' command${NC}\n";
+
+        exit 3;
+fi;
+
+# Creating a variable 'file' for better readability 
+file=$1;
+
+# Title
+echo "URL,CIDR,inetnum,netname,country,descr,org,remarks,mnt-by,Type";
+
+for url in `cat $file`; do
+	#To extract the CIDRs
+	readarray -t cidr <<< "$(curl -sk $url | grep -i cidr | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9][0-9]')";
+	
+	#Testing
+	#for i in ${cidr[@]}; do
+	 #      echo "Net - $i";
+        #done;
+        
+	#To fetch the RIPE Database Information
+	for CIDR in ${cidr[@]}; do
+		ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$CIDR);
+		#exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .descr, .country, .org, .remarks, .mnt-by, .mnt-routes] | @csv');
+		#moreSpecific_data=$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .descr, .country, .org, .remarks, .mnt-by, .mnt-routes] | @csv');
+		#lessSpecific_data=$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .descr, .country, .org, .remarks, .mnt-by, .mnt-routes] | @csv');
+
+		exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
+		readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+		readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+
+		#echo "exact Data - $exact_data";
+		#echo "moreSpecific Data - $moreSpecific_data";
+		#echo "lessSpecific Data - $lessSpecific_data";
+
+
+		if [[ $exact_data ]]
+		then
+			echo "$url,$CIDR,$exact_data,Exact";
+		fi;
+		if [[ $moreSpecific_data ]]
+		then
+			for ((data=0; data<${#moreSpecific_data[@]}; data++)) do
+                                echo "$url,$CIDR,${moreSpecific_data[$data]},MoreSpecific";
+                        done;
+			#echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
+		fi;
+		if [[ $lessSpecific_data ]]
+		then
+			for ((data=0; data<${#lessSpecific_data[@]}; data++)) do
+                                echo "$url,$CIDR,${lessSpecific_data[$data]},LessSpecific";
+                        done;
+			#echo "$url,$CIDR,$lessSpecific_data,LessSpecific";
+		fi;
+
+	done;
+done;       

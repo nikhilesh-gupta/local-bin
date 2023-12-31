@@ -1,0 +1,51 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# HELP | Checks if the Input is NULL | Check if the correct number of arguments are provided
+if [[ $1 = '-h' ]] || [[ -z $1 ]] || [[ "$#" -ne 2 ]]
+then
+        echo "[+]Syntax for tool WEBAPPV{Web Application Validation} is defined below";
+        echo "   -> webappv <webapp_list.txt> <domain_list.txt>";
+        printf "${BLUE}[#]Note: Both the files should be seperated with next line${NC}\n";
+        printf "${BLUE}[#]Description: The tool will check and output only the web applications on the first file whose domain exists on the second file${NC}\n";
+
+        exit 0;
+fi;
+
+
+web_apps_file="$1"
+domains_file="$2"
+
+# Check if the input files exist
+if [ ! -f "$web_apps_file" ] || [ ! -f "$domains_file" ]; then
+  echo "[-]Error: Input files not found."
+  exit 1
+fi
+
+# Read domains into an associative array for faster lookup
+declare -A domains
+
+while IFS= read -r domain; do
+  domain=$(echo "$domain" | xargs)  # Trim leading/trailing whitespace
+  if [ -n "$domain" ]; then  # Check if the domain is not empty
+    domains["$domain"]=1
+  fi
+done < "$domains_file"
+
+# Iterate through web applications and check if their domains are in the list
+while IFS= read -r web_app; do
+  # Extract the domain from the web application entry (assuming domains are in the same format as in the file)
+  domain=$(echo "$web_app" | awk '{print $2}')
+  domain=$(echo "$domain" | xargs)  # Trim leading/trailing whitespace
+  
+  # Check if the domain is not in the list
+  if [ -n "$domain" ] && [ -z "${domains[$domain]}" ]; then
+    echo "Web application without a corresponding domain: $web_app"
+  fi
+done < "$web_apps_file"

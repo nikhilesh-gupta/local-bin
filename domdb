@@ -1,0 +1,107 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# HELP | Checks if the Input is NULL
+if [[ $1 = '-h' ]] || [[ -z $1 ]]
+then
+	echo "[+]Syntax for tool domdb{DOMAIN-WHOIS-DB-in-CSV} is defined below";
+	echo "	->domdb <file.txt>";
+	printf "${BLUE}[#]Note: The file should have the list of domains seperated with next line${NC}\n";
+        printf "${BLUE}[#]Description: The tool will find the information about the domains from the WHOIS Database and gives output in CSV format which needs to be saved either using redirection '>' or 'tee' command${NC}\n";
+
+	exit 3;
+fi;
+
+echo "Domain,Organisation,OrgId,OrgTechEmail,Registrant Name,Registrant Organization,Registrant Email,Admin Name,Admin Organization,Admin Email,Registrar ID", Registrar Name, Registrant Contact Name, Registrant Contact Organisation, Tech Contact Organisation;
+for domains in `cat $1`; do
+         readarray -t out <<< "$(whois $domains | grep -i -e "Organisation" -e "OrgName" -e "OrgId" -e "OrgTechEmail" -e "org-name" -e "Registrant Name" -e "Registrant Organization" -e "Registrant Email" -e "Admin Name" -e "Admin Organization" -e "Admin Email")";
+
+
+         whoisrecord=([0]="N/A" [1]="N/A" [2]="N/A" [3]="N/A" [4]="N/A" [5]="N/A" [6]="N/A" [7]="N/A" [8]="N/A" [9]="N/A" [10]="N/A" [11]="N/A" [12]="N/A");
+         #echo "WHOISRECORD ARRAY INITIAL VALUES: ${whoisrecord[@]}";
+
+         #echo "Out value is ${out[@]}";
+         for record in "${out[@]}"; do
+                 #val=$(echo ${record,,} | cut -d ":" -f1);
+                 #echo "val=$val and record=$record";
+                 #echo " ";
+                if [[ "$(echo ${record,,} | cut -d ":" -f1)" == "organisation" ]] || [[ "$(echo ${record,,} | cut -d ":" -f1)" == "orgname" ]] || [[ "$(echo ${record,,} | cut -d ":" -f1)" == "org-name" ]]
+                then
+                       # echo "Inside organization - Index ";
+                        whoisrecord[0]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "orgid" ]]
+                then
+                        #echo "Inside orgid - Index ";
+                        whoisrecord[1]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "orgtechmail" ]]
+                then
+                        #echo "Inside orgtechmail";
+                        whoisrecord[2]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                        if [[ ! -z $(echo $record | grep -ie "Select Contact Domain Holder link at" -ie "pleasequery" -ie "please query") ]]
+                        then
+                                echo "Inside orgtechmail - Index ";
+                                whoisrecord[2]="N/A";
+                        fi;
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "registrant name" ]]
+                then
+                        #echo "Inside registrant name - Index ";
+                        whoisrecord[3]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "registrant organization" ]]
+                then
+                        #echo "Inside registrant organization - Index ";
+                        whoisrecord[4]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "registrant email" ]]
+                then
+                        #echo "Inside registrant email - Index ";
+                        whoisrecord[5]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                        if [[ ! -z $(echo $record | grep -ie "Select Contact Domain Holder link at" -ie "pleasequery" -ie "please query") ]]
+                        then
+                                #echo "Inside reg email";
+                                whoisrecord[5]="N/A";
+                        fi;
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "admin name" ]]
+                then
+                        #echo "Inside admin name - Index ";
+                        whoisrecord[6]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "admin organization" ]]
+                then
+                        #echo "Inside admin organization - Index ";
+                        whoisrecord[7]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "admin email" ]]
+                then
+                        whoisrecord[8]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                        if [[ ! -z $(echo $record | grep -ie "Select Contact Domain Holder link at" -ie "pleasequery" -ie "please query") ]]
+                        then
+                                #echo "Inside admin email";
+                                whoisrecord[8]="N/A";
+                        fi;
+		elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "registrar name" ]]
+                then
+                        whoisrecord[9]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+		elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "registrant contact name" ]]
+                then
+                        whoisrecord[10]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+		elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "registrant contact organisation" ]]
+                then
+                        whoisrecord[11]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+		elif [[ "$(echo ${record,,} | cut -d ":" -f1)" == "tech contact organisation" ]]
+                then
+                        whoisrecord[12]=$(echo $record | cut -d ":" -f2 | tr -d '[:blank:]');
+                fi;
+                #echo "Index - ";
+                #echo "${whoisrecord[@]}";
+         done;
+
+         #for k in "${whoisrecord[@]}"; do
+        #        echo "k=$k";
+         #done;
+         records=$(printf "%s\n" "${whoisrecord[@]}" | tr ',' ';' | paste -s -d ',');
+         echo "$domains,$records";
+
+done;

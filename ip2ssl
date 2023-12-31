@@ -1,0 +1,64 @@
+#!/usr/bin/python3
+# Written by Gautam Bhattathiri and Nikhilesh Gupta, December 2023
+
+import csv
+import re
+import requests
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
+
+def sslGrab(ip):
+    data = {"host": f"https://{ip}"}
+    r = requests.post('https://www.digicert.com/api/check-host.php', data=data)
+    resp = r.text
+    soup = BeautifulSoup(r.text, 'lxml')
+    
+    soup_issuer = soup.find(string=re.compile('Issuer'))
+    if soup_issuer is not None:
+        issuer = soup_issuer.split('Issuer = ')[1].strip()
+    else:
+        issuer = "None"
+   
+    soup_subjects = soup.find('td', string='Subject')
+    if soup_subjects is not None:
+        soup_subject = soup_subjects.find_next('td').string
+        if soup_subject is not None:
+            subject = soup_subject.strip()
+        else:
+            subject = "None"
+    else:
+        subject = "None"
+
+    soup_cn = soup.find(string=re.compile('Common Name'))
+    try:
+        cn = soup_cn.split('Common Name = ')[1].strip()
+    except:
+        cn = "None"
+
+    return cn, issuer, subject
+
+ip_list = []
+
+# Input file names
+INPUT_FILE = input("Enter the input file name: ")
+OUTPUT_FILE = input("Enter the output file name[Ex:output.csv]: ")
+
+# Reading the file
+with open(INPUT_FILE, 'r') as input_file:
+    csv_reader = csv.reader(input_file)
+    for row in csv_reader:
+        ip_list.append(row[0])
+def process_ip(ip):
+    cn, issuer, subject = sslGrab(ip)
+
+    return [ip, cn, issuer, subject]
+
+# Writing on the file
+with open(OUTPUT_FILE, 'w', newline='') as output_file:
+    csv_writer = csv.writer(output_file)
+    csv_writer.writerow(['ip', 'cn', 'issuer', 'subject'])
+
+    with ThreadPoolExecutor() as executor:
+        results = executor.map(process_ip, ip_list)
+        for result in results:
+            csv_writer.writerow(result)

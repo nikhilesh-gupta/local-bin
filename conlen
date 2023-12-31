@@ -1,0 +1,31 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# HELP | Checks if the Input is NULL | Check if the correct number of arguments are provided
+if [[ $1 = '-h' ]] || [[ -z $1 ]] || [[ "$#" -ne 2 ]]
+then
+	echo "[+]Syntax for tool con-zero{CONTENT LENGTH ZERO} is defined below";
+	echo "	->conlen <content-length> <file.txt>";
+	echo "	->[Examples]";
+	echo "		- conlen 432 file.txt : to find URLs with content length as 432";
+	echo "		- conlen 0 file.txt : to find URLs with content length as 0";
+	printf "${BLUE}[#]Note: The file should have the list of URLs seperated with next line${NC}\n";
+	printf "${BLUE}[#]Description: The tool will find the URLs having the content length same as given in the input${NC}\n";
+
+	exit 3;
+fi;
+
+for url in `cat $1`; do
+	content_length=$(curl -s -I -k $url | grep -i content-length | cut -d ":" -f2 | tr -d '[:space:]');
+	# Checks if the Content Length is 0
+	if [ ! $content_length -eq $1 ]
+	then
+		echo $url;
+	fi;
+done

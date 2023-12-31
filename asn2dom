@@ -1,0 +1,69 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# HELP | Checks if the Input is NULL
+if [[ $1 = '-h' ]] || [[ -z $1 ]]
+then
+	echo "[+]Syntax for tool ASN2DOM{ASN-to-DOMAIN} is defined below";
+	echo "	->asn2dom <file.txt>";
+	printf "${BLUE}[#]Note: The file should have the list of AS Numbers seperated with next line${NC}\n";
+	printf "${BLUE}[#]Description: The tool will find the PTR records from the ASN which can be further filter manually to extract domains${NC}\n";
+
+	exit 3;
+fi;
+
+# Loading the .env file on the environment
+ENV_FILE_PATH="$HOME/local-bin/.env";
+if [ ! -e $ENV_FILE_PATH ]
+then
+    printf "${RED}[-]Error: .env file not found!!${NC}\n";
+    printf "${YELLOW}[!]Modify the variable 'ENV_FILE_PATH' with your .env file path in the script${NC}\n";
+	
+	exit 1;
+else 	
+    source $ENV_FILE_PATH;
+fi;
+
+# Checks if IPINFO TOKEN exists
+if [ -z $ipinfo_token ]
+then
+	printf "${RED}[-]Error: The IPINFO TOKEN environment variable is not set${NC}\n";
+    printf "${YELLOW}[!]Configure IPINFO TOKEN in the .env file present on 'local-bin' directory before running this script${NC}\n";
+    
+	exit 1;
+fi;
+
+# ASN from a file
+for ASN in `cat $1`; do
+	# Checks if the input ASN have the substring AS 
+	if [[ '$ASN' != *'as'* && '$ASN' != *'AS'* ]]
+	then
+		ASN="AS$ASN";
+	fi;
+
+	# API Call to fetch netblock, id, name data
+	readarray -t result <<< "$(curl -s https://ipinfo.io/$ASN/json?token=$ipinfo_token -L | jq -r '.prefixes[] | [.netblock, .id, .name] | @csv')";
+
+	# Find the IPs from the netblocks identified above
+	for ((data=0; data<${#result[@]}; data++)) do
+		#echo "Data - $data";
+		net=$(echo "${result[$data]}" | cut -d "," -f 1 | tr -d "\"");
+		#echo $net;
+
+		net_ips=$(cidr2ip $net);
+
+		# Fetching PTR records for the IPs
+                for ip in $net_ips; do
+                    # Echoing all relevant data
+					echo $(ip2ptr $ip),$ASN,${result[$data]} | tr -d "\"";
+                done;
+	done;
+	
+done;
+

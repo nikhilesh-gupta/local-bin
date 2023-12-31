@@ -1,0 +1,39 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, December 2023
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+
+# HELP | Checks if the Input is NULL
+if [[ $1 = '-h' ]] || [[ -z $1 ]]
+then
+        echo "[+]Syntax for tool NS is defined below";
+        echo "   -> ns <file.txt>";
+        echo "   -> ns -v <file.txt>";
+        printf "${BLUE}[#]Note: The file should have the list of domains/subdomains seperated with next line${NC}\n";
+        printf "${BLUE}[#]Description: The tool will find the IPs from the list of domain/subdomains. The verbose mode can be used to keep the evidence of attribution of IPs via saving the output${NC}\n";
+
+        exit 3;
+fi;
+
+# Checks if Verbose option is set
+if [ $1 = '-v' ]
+then
+        for i in `cat $2`; do
+                echo "Subdomain - $i";
+                nslookup $i;
+                echo " ";
+                echo "-------------------------------------------";
+                echo " ";
+        done;
+
+	exit 0;
+
+# Fetching IPs
+for i in `cat $1`; do
+        nslookup $i | grep "Address" | grep -v "#53" | cut -d " " -f 2;
+done
