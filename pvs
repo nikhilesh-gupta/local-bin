@@ -1,0 +1,371 @@
+#!/bin/bash
+# Written by Nikhilesh Gupta, April 2024
+
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
+
+
+# Function contains HELP information related to the script
+help_and_syntax_section() {
+    printf "${YELLOW}[+] Syntax for tool PVS (Port-Vulnerability-Scanner):${NC}\n"
+    printf "   -> ${CYAN}pvs -d <host>${NC}         # Specify a single host\n"
+    printf "   -> ${CYAN}pvs -f <file.txt>${NC}     # Specify a file containing multiple hosts\n"
+    printf "${CYAN}   Optional Flags:${NC}\n"
+    printf "     ${GREEN}-p <port>${NC}             # Specify ports on which Nmap will run ${MAGENTA}[Default: All Ports]${NC}\n"
+    printf "     ${GREEN}-t <template_path>${NC}    # Specify Nuclei template(s) path ${MAGENTA}[Default: $HOME/nuclei-templates]${NC}\n"
+    printf "${YELLOW}[#]Description:${NC} ${BLUE}The tool PVS conducts Nmap scans on specified hosts and follows up with Nuclei scans on identified {host:port} pairs.${NC}\n";
+    printf "${YELLOW}[#]Note:${NC} ${BLUE}The file in provided on flag: '-f' should have the list of hosts{'example.com' or 'sub.example.com' or '192.168.1.20'} seperated with next line.${NC}\n";
+    printf "${YELLOW}[#]Examples:${NC}\n";
+    printf "    -> ${CYAN}pvs -d www.example.com -p 21,22,80,443 -t /root/nuclei-templates/${NC}\n";
+    printf "    -> ${CYAN}pvs -f file.txt -p 1000-5000${NC}\n";
+    printf "    -> ${CYAN}pvs -d example.com -f file.txt -t /root/nuclei-templates/some_template.yaml${NC}\n";
+
+    exit 0;
+}
+
+pvs_running_nmap_and_nuclei (){
+    local run_nmap_and_nuclei_on="$1"
+    
+    if [[ $run_nmap_and_nuclei_on == "on_host" ]]
+    then
+        # echo "Host:$host | Port:$nmap_port | Template:$nuclei_template"
+        # echo "Directory: $directory"
+
+        # Checking if the end-user provided any port specification
+        if [[ -z $nmap_port ]]; then
+            if [[ -z $nuclei_template ]]; then
+                screen -S "$host-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn $host -oX $directory/nmap/$host.xml"
+                (while ps -e -o command | grep -iq "screen -S $host-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host.xml > $directory/nmap/$host-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host.txt") &
+            else
+                screen -S "$host-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn $host -oX $directory/nmap/$host.xml"
+                (while ps -e -o command | grep -iq "screen -S $host-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host-NUCLEI -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host.xml > $directory/nmap/$host-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host-host-to-port.txt -t $nuclei_template| tee $directory/nuclei/Nuclei_output_for-$host.txt") &
+            fi
+        else
+            if [[ -z $nuclei_template ]]; then
+                screen -S "$host-NMAP" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn $host -oX $directory/nmap/$host.xml"
+                (while ps -e -o command | grep -iq "screen -S $host-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host.xml > $directory/nmap/$host-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host.txt") &
+            else
+                screen -S "$host-NMAP" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn $host -oX $directory/nmap/$host.xml"
+                (while ps -e -o command | grep -iq "screen -S $host-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host-NUCLEI -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host.xml > $directory/nmap/$host-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host-host-to-port.txt -t $nuclei_template| tee $directory/nuclei/Nuclei_output_for-$host.txt") &
+            fi
+        fi
+    fi;
+
+    if [[ $run_nmap_and_nuclei_on == "on_host_file" ]]
+    then
+        number_of_lines=$(wc -l < "$host_file")
+        # Number of sub-files created
+        if [ "$will_split" -eq 0 ]; then
+            number_of_subfiles=1
+        elif [ "$will_split" -eq 1 ]; then
+            number_of_subfiles=$((number_of_lines / 50))
+
+        elif [ "$will_split" -eq 2 ]; then
+            number_of_subfiles=$((number_of_lines / 100))
+        fi
+
+        # echo "Host:$host_file | Port:$nmap_port | Subfiles:$number_of_subfiles/$will_split| Template:$nuclei_template"
+        # echo "Directory: $directory"
+
+        # Checking if the end-user provided any port specification
+        if [[ -z $nmap_port ]]; then
+            if [[ -z $nuclei_template ]]; then
+                if [ $number_of_subfiles -eq 1 ]; then # Case: No subfile created / 1 input file exists
+                    # echo "screen -S \"$host_file-NMAP\" -d -m bash -c \"nmap -p- -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml && screen -S $host_file-NUCLEI -d -m bash -c \"nuclei -u $host_file\"\""
+                    screen -S "$host_file-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml"
+                    (while ps -e -o command | grep -iq "screen -S $host_file-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file.xml > $directory/nmap/$host_file-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host_file.txt") &
+                else
+                    suffix=0
+                    # for subfiles in $number_of_subfiles; do
+                    for ((suffix = 0; suffix <= $number_of_subfiles; suffix++)); do
+                        if [ $suffix -lt 10 ]; then
+                            # echo "screen -S \"$host-NMAP\" -d -m bash -c \"nmap -p- -sV -sC -A -Pn -iL $directory/$host_file-0$suffix -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $host_file\"\""
+                            screen -S "$host_file-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml"
+                            (while ps -e -o command | grep -iq "screen -S $host_file-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file.xml > $directory/nmap/$host_file-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host_file.txt") &
+                        else
+                            echo "screen -S \"$host-NMAP\" -d -m bash -c \"nmap -p- -v -sV -sC -A -Pn -iL $directory/$host_file-$suffix -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $host_file\"\""
+                        fi
+                    done
+                fi
+            else
+                if [ $number_of_subfiles -eq 1 ]; then # Case: No subfile created / 1 input file exists
+                    # echo "screen -S \"$host_file-NMAP\" -d -m bash -c \"nmap -p- -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml && screen -S $host_file-NUCLEI -d -m bash -c \"nuclei -u $host_file -t $nuclei_template\"\""
+                    screen -S "$host_file-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml"
+                    (while ps -e -o command | grep -iq "screen -S $host_file-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file.xml > $directory/nmap/$host_file-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-host-to-port.txt -t $nuclei_temnplate| tee $directory/nuclei/Nuclei_output_for-$host_file.txt") &
+                else
+                    suffix=0
+                    # for subfiles in $number_of_subfiles; do
+                    for ((suffix = 0; suffix <= $number_of_subfiles; suffix++)); do
+                        if [ $suffix -lt 10 ]; then
+                            # echo "screen -S \"$host-NMAP\" -d -m bash -c \"nmap -p- -sV -sC -A -Pn -iL $directory/$host_file-0$suffix -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $file\"\""
+                            screen -S "$host-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn $host -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $file\""
+                        else
+                            echo "screen -S \"$host-NMAP\" -d -m bash -c \"nmap -p- -v -sV -sC -A -Pn -iL $directory/$host_file-$suffix -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $host_file -t $nuclei_template\"\""
+                        fi
+                    done
+                fi
+            fi
+        else
+            if [[ -z $nuclei_template ]]; then
+                if [ $number_of_subfiles -eq 1 ]; then # Case: No subfile created / 1 input file exists
+                    # echo "screen -S \"$host_file-NMAP\" -d -m bash -c \"nmap -p $nmap_port -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml && screen -S $host_file-NUCLEI -d -m bash -c \"nuclei -u $host_file\"\""
+                    screen -S "$host_file-NMAP" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml"
+                    (while ps -e -o command | grep -iq "screen -S $host_file-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file.xml > $directory/nmap/$host_file-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host_file.txt") &
+                else
+                    suffix=0
+                    # for subfiles in $number_of_subfiles; do
+                    for ((suffix = 0; suffix <= $number_of_subfiles; suffix++)); do
+                        if [ $suffix -lt 10 ]; then
+                            # echo "screen -S \"$host_file-NMAP-0$suffix\" -d -m bash -c \"nmap -p $nmap_port -sV -sC -A -Pn -iL $directory/$host_file-0$suffix -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $host_file\"\""
+                            screen -S "$host_file-NMAP-0$suffix" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn -iL $$directory/$host_file-0$suffix -oX $directory/nmap/$host_file-0$suffix.xml"
+                            (while ps -e -o command | grep -iq "screen -S $host_file-NMAP-0$suffix" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-NUCLEI-0$suffix -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file-0$suffix.xml > $directory/nmap/$host_file-0$suffix-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-0$suffix-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host_file-0$suffix.txt") &
+                        else
+                            # echo "screen -S \"$host_file-NMAP-$suffix\" -d -m bash -c \"nmap -p $nmap_port -sV -sC -A -Pn -iL $directory/$host_file-$suffix -oX $directory/nmap/$host.xml && screen -S $host-NUCLEI -d -m bash -c \"nuclei -u $host_file\"\""
+                            screen -S "$host_file-NMAP-$suffix" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn -iL $$directory/$host_file-$suffix -oX $directory/nmap/$host_file-$suffix.xml"
+                            (while ps -e -o command | grep -iq "screen -S $host_file-NMAP-$suffix" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-NUCLEI-$suffix -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file-$suffix.xml > $directory/nmap/$host_file-$suffix-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-$suffix-host-to-port.txt | tee $directory/nuclei/Nuclei_output_for-$host_file-$suffix.txt") &
+                        fi
+                    done
+                fi
+            else
+                if [ $number_of_subfiles -eq 1 ]; then # Case: No subfile created / 1 input file exists
+                    # echo "screen -S \"$host_file-NMAP\" -d -m bash -c \"nmap -p $nmap_port -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml && screen -S $host_file-NUCLEI -d -m bash -c \"nuclei -u $host_file -t $nuclei_template\"\""
+                    screen -S "$host_file-NMAP" -d -m bash -c "nmap -p- -v -sV -sC -A -Pn -iL $host_file -oX $directory/nmap/$host_file.xml"
+                    (while ps -e -o command | grep -iq "screen -S $host_file-NMAP" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-Nuclei -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file.xml > $directory/nmap/$host_file-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-host-to-port.txt -t $nuclei_template| tee $directory/nuclei/Nuclei_output_for-$host_file.txt") &
+                else
+                    suffix=0
+                    # for subfiles in $number_of_subfiles; do
+                    for ((suffix = 0; suffix <= $number_of_subfiles; suffix++)); do
+                        if [ $suffix -lt 10 ]; then
+                            screen -S "$host_file-NMAP-0$suffix" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn -iL $$directory/$host_file-0$suffix -oX $directory/nmap/$host_file-0$suffix.xml"
+                            (while ps -e -o command | grep -iq "screen -S $host_file-NMAP-0$suffix" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-NUCLEI-0$suffix -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file-0$suffix.xml > $directory/nmap/$host_file-0$suffix-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-0$suffix-host-to-port.txt -t $nuclei_template | tee $directory/nuclei/Nuclei_output_for-$host_file-0$suffix.txt") &
+                        else
+                            screen -S "$host_file-NMAP-$suffix" -d -m bash -c "nmap -p $nmap_port -v -sV -sC -A -Pn -iL $$directory/$host_file-$suffix -oX $directory/nmap/$host_file-$suffix.xml"
+                            (while ps -e -o command | grep -iq "screen -S $host_file-NMAP-$suffix" >/dev/null 2>&1; do sleep 5; done && screen -S $host_file-NUCLEI-$suffix -d -m bash -c "xmlstarlet sel -t -m '//port/state[@state=\"open\"]/parent::port' -v 'ancestor::host/address/@addr' -o : -v './@portid' -n $directory/nmap/$host_file-$suffix.xml > $directory/nmap/$host_file-$suffix-host-to-port.txt; nuclei -update; nuclei -update-templates; nuclei -l $directory/nmap/$host_file-$suffix-host-to-port.txt -t $nuclei_template | tee $directory/nuclei/Nuclei_output_for-$host_file-$suffix.txt") &
+                        fi
+                    done
+                fi
+            fi
+        fi
+    fi;
+}
+
+pvs_hostfile (){
+
+	# Check if provided hosts file exists
+	if [ ! -f $host_file ]
+    then
+        printf "${RED}[-]File doesn't exists. Please check the path again.${NC}\n"
+        exit 20;
+    fi;
+
+    # Count number of hosts in the file
+    number_of_hosts=$(wc -l < "$host_file")
+    
+    # Splitting the file into sub-files to run parallely
+    if [[ "$number_of_hosts" -le 60 ]]
+    then
+        printf "${YELLOW}[+]INFO: File will not split as the number of hosts are less. ${NC}\n"
+        will_split=0
+    elif [[ "$number_of_hosts" -gt 60 && "$number_of_hosts" -le 230 ]]
+    then
+        # Split file into files with 50 lines each
+        split -dl 50 "$host_file" "$directory/$(basename "$host_file")-"
+        printf "${YELLOW}[+]INFO: File split into multiple files with 50 lines each. ${NC}\n"
+        will_split=1
+    else
+        # Split file into files with 100 lines each
+        split -dl 100 "$host_file" "$directory/$(basename "$host_file")-"
+        printf "${YELLOW}[+]INFO: File split into multiple files with 100 lines each. ${NC}\n"
+        will_split=2
+    fi;
+
+    pvs_running_nmap_and_nuclei "on_host_file"
+}
+
+pvs_host () {
+    pvs_running_nmap_and_nuclei "on_host"
+}
+
+hosts_syntax_checker () {
+    # Regular expression to match domain, subdomain, or IP address
+    syntax_regex_check="^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$)|^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.){1,}([a-zA-Z]{2,}|xn\-\-[a-zA-Z0-9]{4,})$"
+
+    if [[ ! -z $host ]]; then
+        # Check if the host is provided along with protocols
+        if [[ $host == *"://"* ]]; then
+            printf "${RED}[-]Error: The host includes either http://, https://, or any other protocol - Please provide hosts without protocols. ${NC}\n"
+
+            exit 2;
+        fi;
+
+        # Check if the host is a Domain, Subdomain or an IP address + checks if the end user mistakenly given file as input in '-d' flag
+        if ! [[ $host =~ $syntax_regex_check ]] || [[ $host == *".txt" || $host == *".csv" || $host == *".xml" || $host == *".log" || $host == *".tsv" ]]; then
+            printf "${RED}[-]Error: The host provided is not a valid domain, subdomain, or IP address. ${NC}\n"
+
+            exit 2;
+        fi;
+    fi;
+    if [[ ! -z $host_file ]]; then
+
+        invalid_protocol=() # variable to collect all the hosts which contains protocols
+        invalid_host=() # variable to collect all the invalid hosts
+
+        for each_host in `cat $host_file`; do
+            # Check if the host is provided along with protocols
+            if [[ $each_host == *"://"* ]]; then
+                invalid_protocol+=("$each_host")
+            fi;
+
+            # Check if the host is a Domain, Subdomain or an IP address
+            if ! [[ $each_host =~ $syntax_regex_check ]]; then
+                invalid_host+=("$each_host")
+            fi;
+        done
+
+        if [[ ${#invalid_protocol[@]} -gt 0 ]]; then
+            printf "${RED}[-]Error: The below hosts provided on the $host_file includes either http://, https://, or any other protocol - Please provide hosts without protocols. ${NC}\n"
+
+            for value in "${invalid_protocol[@]}"; do
+                echo "$value"
+            done
+
+            exit 2;
+        fi
+
+        if [[ ${#invalid_host[@]} -gt 0 ]]; then
+            printf "${RED}[-]Error: The below hosts provided on the $host_file is not a valid domain, subdomain, or IP address. ${NC}\n"
+
+            for value in "${invalid_host[@]}"; do
+                echo "$value"
+            done
+
+            exit 2;
+        fi
+    fi;
+}
+
+
+# Checking the prerequisites
+if ! command -v nmap &>/dev/null; then
+    printf "${RED}[-]MISSING: nmap command is not installed.\n"
+    printf "${BLUE}[#]Note: Execute the command -> 'sudo apt install nmap -y'${NC}\n"
+    exit 2;
+fi
+if ! command -v nuclei &>/dev/null; then
+    printf "${RED}[-]MISSING: nuclei command is not installed.\n"
+    printf "${BLUE}[#]Note: Execute the command -> 'go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest'${NC}\n"
+    exit 2;
+fi
+if ! command -v xmlstarlet &>/dev/null; then
+    printf "${RED}[-]MISSING: xmlstarlet command is not installed.\n"
+    printf "${BLUE}[#]Note: Execute the command -> 'sudo apt install xmlstarlet -y'${NC}\n"
+    exit 2;
+fi
+
+# Assigning variables for user input
+
+host="" # for single host ('-d')
+host_file="" # for file contaning multiple hosts ('-f')
+nmap_port="" # for specifying ports on which Nmap will run ('-p')
+nuclei_template="" # for specifying Nuclei template(s) path ('-t')
+
+# Script variables
+
+is_mandatory_flag_set=0 # To check if either of the mandatory flag ('-d' or '-f') is provided by the user or not
+directory="" # PVS Analysis Directory
+will_split= # In case of host-file, will the file split?
+
+
+# Checking if no command-line arguments is provided
+if [[ -z $1 ]]; then
+    cli_arg=true
+else
+    cli_arg=false
+fi
+
+if [ $cli_arg ]
+then
+    # To check if -h flag is provided
+    if [[ $1 = '-h' ]]
+    then
+        help_and_syntax_section
+    else
+        # Looping through the command-line arguments to parse flags and their values
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                -d)
+                    shift
+                    if [[ -z "$1" ]]; then
+                        printf "${RED}[-] Flag provided but not defined: -d${NC}\n\n"
+
+                    else
+                        host="$1"
+                        is_mandatory_flag_set=1
+                    fi
+                    ;;
+                -f)
+                    shift
+                    if [[ -z "$1" ]]; then
+                        printf "${RED}[-] Flag provided but not defined: -f${NC}\n\n"
+
+                    else
+                        host_file="$1"
+                        is_mandatory_flag_set=1
+                    fi
+                    ;;
+                -p)
+                    shift
+                    if [[ -z "$1" ]]; then
+                        printf "${RED}[-] Flag provided but not defined: -p${NC}\n\n"
+                    else
+                        nmap_port="$1"
+                    fi
+                    ;;
+                -t)
+                    shift
+                    if [[ -z "$1" ]]; then
+                        printf "${RED}[-] Flag provided but not defined: -t${NC}\n\n"
+                    else
+                        nuclei_template="$1"
+                    fi
+                    ;;
+                *)
+                    printf "${RED}[-] Unknown flag or incorrect way to use the flag: $1${NC}\n\n"
+                    ;;
+            esac
+            shift
+        done
+    fi;
+    # Checks if mandatory flags are properly set
+    if [[ $is_mandatory_flag_set -eq 0 ]]
+    then
+        help_and_syntax_section
+    fi;
+
+    hosts_syntax_checker
+    
+    # Get the current date and time
+    current_date_time=$(date +"%Y-%m-%d_%H-%M-%S")
+    # Creating a directory to store program outputs and analysis data
+    directory="pvs-analysis-$current_date_time"
+    mkdir -p "$directory" "$directory/nmap" "$directory/nuclei"
+    printf "${YELLOW}[+]INFO: Data will be saved on the following directory : $directory ${NC}\n"
+
+    # Running the script
+    if [[ ! -z $host ]]; then
+        pvs_host
+    fi;
+    if [[ ! -z $host_file ]]; then
+        pvs_hostfile
+    fi;
+
+else
+    # If no argument is provided
+    help_and_syntax_section
+fi;
