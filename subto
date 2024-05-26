@@ -1,16 +1,31 @@
 #!/bin/bash
 # Written by Nikhilesh Gupta, December 2023
 
+# Define color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
+
+
+# Function contains HELP information related to the script
+help_and_syntax_section() {
+        printf "${YELLOW}[+]Syntax for tool SUBTO{Subdomain-TakeOver}:${NC}\n";
+        printf "   -> ${CYAN}subto -f <file.txt>${NC}\n";
+        printf "   -> ${CYAN}subto -d <domain.com>${NC}\n";
+        printf "${YELLOW}[#]Description:${NC} ${BLUE}The tool will check if the provided subdomains are vulnerable to Subdomain TakeOver attack${NC}\n";
+	printf "${YELLOW}[#]Note:${NC} ${BLUE}The file should have the list of subdomains{sub.example.com} seperated with next line${NC}\n";
+
+        exit 0;
+}
+
 # HELP | Checks if the Input is NULL
 if [[ $1 = '-h' ]] || [[ -z $1 ]]
 then
-        echo "[+]Syntax for tool SUBTO{Subdomain-TakeOver} is defined below";
-        echo "   -> subto -f <file.txt>";
-        echo "   -> subto -d <domain.com>";
-        printf "${BLUE}[#]Note: The file should have the list of subdomains\{sub.example.com\} seperated with next line${NC}\n";
-        printf "${BLUE}[#]Description: The tool will check if the provided subdomains have any probability for takeover attacks${NC}\n";
-
-        exit 0;
+        help_and_syntax_section
 fi;
 
 #Code for the list of domains!!
@@ -83,11 +98,6 @@ then
 
 #Checks if the inputed value is incorrect!!
 else
-        echo "[!]Please give valid input";
-        echo "";
-        echo "[+]Use the syntax defined below";
-        echo "   -> subto -f <file.txt>";
-        echo "   -> subto -d <domain.com>";
-
-        exit 10;
+        printf "${RED}[-]Error: Invalid syntax used for the tool, kindly refer to the help section below${NC}\n\n";
+        help_and_syntax_section
 fi;
