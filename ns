@@ -1,39 +1,85 @@
 #!/bin/bash
-# Written by Nikhilesh Gupta, December 2023
+# Written by Nikhilesh Gupta, December 2023 [ Last Updated At : June 2024 ]
 
 # Define color codes
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
 
-# HELP | Checks if the Input is NULL
-if [[ $1 = '-h' ]] || [[ -z $1 ]]
-then
-        echo "[+]Syntax for tool NS is defined below";
-        echo "   -> ns <file.txt>";
-        echo "   -> ns -v <file.txt>";
-        printf "${BLUE}[#]Note: The file should have the list of domains/subdomains seperated with next line${NC}\n";
-        printf "${BLUE}[#]Description: The tool will find the IPs from the list of domain/subdomains. The verbose mode can be used to keep the evidence of attribution of IPs via saving the output${NC}\n";
+# Function contains HELP information related to the script
+help_and_syntax_section() {
+        printf "${YELLOW}[+]Syntax for tool NS{NSLOOKUP-SWISS}:${NC}\n";
+        printf "   -> ${CYAN}ns <file.txt>${NC}\n";
+        printf "   -> ${CYAN}ns -v <file.txt>${NC}\n";
+        printf "${YELLOW}[#]Description:${NC} ${BLUE}The tool will find the IPs from the list of domain/subdomains. The verbose mode can be used to keep the evidence of attribution of IPs via saving the output${NC}\n";
+        printf "${YELLOW}[#]Note:${NC} ${BLUE}The file should have the list of domains/subdomains seperated with next line${NC}\n";
 
-        exit 3;
-fi;
+        exit 0;
+}
 
-# Checks if Verbose option is set
-if [ $1 = '-v' ]
-then
-        for i in `cat $2`; do
-                echo "Subdomain - $i";
-                nslookup $i;
+# Funtion to fetch the IPs from the file of subdomains in verbose
+nslookup_verbose() {
+        for subdomain in `cat $file`; do
+                echo "Subdomain - $subdomain";
+                nslookup $subdomain;
                 echo " ";
                 echo "-------------------------------------------";
                 echo " ";
+
         done;
 
 	exit 0;
+}
 
-# Fetching IPs
-for i in `cat $1`; do
-        nslookup $i | grep "Address" | grep -v "#53" | cut -d " " -f 2;
-done
+# Funtion to fetch the IPs from the file of subdomains
+nslookup_short() {
+        # Fetching IPs
+        for subdomain in `cat $file`; do
+                nslookup $subdomain | grep "Address" | grep -v "#53" | cut -d " " -f 2;
+        done
+}
+
+# Function tp check of the file exists
+check_file() {
+        if ! [ -f $file ]
+        then
+                printf "${RED}[-]Error: The file $file doesn't exists. Please check the path or name of the file${NC}\n";
+                exit 1;
+        fi;
+}
+
+# Assigning variable(s) for user input
+file="" # takes file which contains the data
+
+# Checking if no command-line arguments is provided
+if [[ -z $1 ]]; then
+    cli_arg=false
+else
+    cli_arg=true
+fi
+
+if $cli_arg
+then
+        # To check if -h flag is provided
+        if [[ $1 = '-h' ]]
+        then
+                help_and_syntax_section
+        elif [[ $1 = '-v' ]]
+        then
+                file=$2
+                check_file
+                nslookup_verbose
+        else
+                file=$1
+                check_file
+                nslookup_short
+        fi;
+else
+        # If no argument is provided
+        help_and_syntax_section
+fi;

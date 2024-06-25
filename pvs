@@ -289,7 +289,7 @@ else
     cli_arg=false
 fi
 
-if [ $cli_arg ]
+if $cli_arg
 then
     # To check if -h flag is provided
     if [[ $1 = '-h' ]]
