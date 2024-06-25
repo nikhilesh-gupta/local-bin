@@ -1,5 +1,5 @@
 #!/bin/bash
-# Written by Nikhilesh Gupta, December 2023
+# Written by Nikhilesh Gupta, December 2023 [ Last Updated At : June 2024 ]
 
 # Define color codes
 RED='\033[0;31m'
@@ -51,11 +51,11 @@ then
                         #echo $record;
                         status=$(dig CNAME $record | grep status: | cut -d "," -f2);
                         #echo $status;
-                        if [[ $status="status: NXDOMAIN" ]]
+                        if [[ $status = "status: NXDOMAIN" ]]
                         then
-                                echo "[+]Asset: $2 | CNAME $record |$status | Possible Subdomain Takeover";
+                                echo "[+]Asset: $subdomain | CNAME $record |$status | Possible Subdomain Takeover";
                         else
-                                echo "[-]Asset: $2 | CNAME $record |$status | Takeover (might) Not Possible";
+                                echo "[-]Asset: $subdomain | CNAME $record |$status | Takeover (might) Not Possible";
                         fi;
                 else
                         echo "[!]CNAME doesn't exists for $2";
@@ -82,7 +82,7 @@ then
                 #echo $record;
                 status=$(dig CNAME $record | grep status: | cut -d "," -f2);
                 #echo $status;
-                if [[ $status="status: NXDOMAIN" ]]
+                if [[ $status = "status: NXDOMAIN" ]]
                 then
                         echo "[+]Asset: $2 | CNAME $record |$status | Possible Subdomain Takeover";
                 else

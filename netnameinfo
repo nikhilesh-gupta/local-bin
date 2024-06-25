@@ -1,5 +1,5 @@
 #!/bin/bash
-# Written by Nikhilesh Gupta, December 2023 [ Last Updated At : May 2024 ]
+# Written by Nikhilesh Gupta, December 2023 [ Last Updated At : June 2024 ]
 
 # Define color codes
 RED='\033[0;31m'
@@ -23,136 +23,136 @@ help_and_syntax_section() {
 		printf "${YELLOW}[#]Examples:${NC}\n";
 		printf "    -> ${CYAN}netnameinfo -u https://networksdb.io/ip-addresses-of/google-ltd${NC}\n";
 		printf "    -> ${CYAN}netnameinfo -n 192.168.1.0/24${NC}\n";
-		printf "    -> ${CYAN}netnameinfo -uf file.txt${NC}		# File contains networksdb.io urls seperated by lines\n";		
-		printf "    -> ${CYAN}netnameinfo -nf file.txt${NC}		# File contains netblocks seperated by lines\n";		
+		printf "    -> ${CYAN}netnameinfo -uf file.txt${NC}             # File contains networksdb.io urls seperated by lines\n";
+		printf "    -> ${CYAN}netnameinfo -nf file.txt${NC}             # File contains netblocks seperated by lines\n";
         exit 0;
 }
 
 extract_ripedb_data_from_urls(){
-	# Title
-	echo "URL,CIDR,inetnum,netname,country,descr,org,remarks,mnt-by,Type";
+        # Title
+        echo "URL,CIDR,inetnum,netname,country,descr,org,remarks,mnt-by,Type";
 
-	# Fetching the information from the RIPE Database
-	for CIDR in ${cidr_list[@]}; do
-		ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$CIDR);
+        # Fetching the information from the RIPE Database
+        for CIDR in ${cidr_list[@]}; do
+                ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$CIDR);
 
-		exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
-		readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
-		readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+                exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
+                readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+                readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
 
 
-		if [[ $exact_data ]]
-		then
-			echo "$url,$CIDR,$exact_data,Exact";
-		fi;
-		if [[ $moreSpecific_data ]]
-		then
-			for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
-				echo "$url,$CIDR,${moreSpecific_data[$data]},MoreSpecific";
-			done;
-			#echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
-		fi;
-		if [[ $lessSpecific_data ]]
-		then
-			for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
-				echo "$url,$CIDR,${lessSpecific_data[$data]},LessSpecific";
-			done;
-			#echo "$url,$CIDR,$lessSpecific_data,LessSpecific";
-		fi;
-	done;
+                if [[ $exact_data ]]
+                then
+                        echo "$url,$CIDR,$exact_data,Exact";
+                fi;
+                if [[ $moreSpecific_data ]]
+                then
+                        for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
+                                echo "$url,$CIDR,${moreSpecific_data[$data]},MoreSpecific";
+                        done;
+                        #echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
+                fi;
+                if [[ $lessSpecific_data ]]
+                then
+                        for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
+                                echo "$url,$CIDR,${lessSpecific_data[$data]},LessSpecific";
+                        done;
+                        #echo "$url,$CIDR,$lessSpecific_data,LessSpecific";
+                fi;
+        done;
 }
 
 extract_ripedb_data_from_netblocks(){
-	# Title
-	echo "CIDR,inetnum,netname,country,descr,org,remarks,mnt-by,Type";
+        # Title
+        echo "CIDR,inetnum,netname,country,descr,org,remarks,mnt-by,Type";
 
-	if ! [[ -z $file ]]; then
-		# Fetching the information from the RIPE Database
-		for CIDR in `cat $file`; do
-			ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$CIDR);
+        if ! [[ -z $file ]]; then
+                # Fetching the information from the RIPE Database
+                for CIDR in `cat $file`; do
+                        ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$CIDR);
 
-			exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
-			readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
-			readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
-
-
-			if [[ $exact_data ]]
-			then
-				echo "$CIDR,$exact_data,Exact";
-			fi;
-			if [[ $moreSpecific_data ]]
-			then
-				for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
-					echo "$CIDR,${moreSpecific_data[$data]},MoreSpecific";
-				done;
-				#echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
-			fi;
-			if [[ $lessSpecific_data ]]
-			then
-				for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
-					echo "$CIDR,${lessSpecific_data[$data]},LessSpecific";
-				done;
-				#echo "$url,$CIDR,$lessSpecific_data,LessSpecific";
-			fi;
-		done;
-	else
-		# Checks if the netblock is valid or not
-		if ! [[ $netblock =~ $cidr_regex ]]; then
-			printf "${RED}[-]Error: The netblock provided is invalid.${NC}\n"
-
-			exit 2;
-		fi;
-
-		ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$netblock);
-
-		exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
-		readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
-		readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+                        exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
+                        readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+                        readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
 
 
-		if [[ $exact_data ]]
-		then
-			echo "$netblock,$exact_data,Exact";
-		fi;
-		if [[ $moreSpecific_data ]]
-		then
-			for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
-				echo "$netblock,${moreSpecific_data[$data]},MoreSpecific";
-			done;
-			#echo "$netblock,$moreSpecific_data,MoreSpecific";
-		fi;
-		if [[ $lessSpecific_data ]]
-		then
-			for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
-				echo "$netblock,${lessSpecific_data[$data]},LessSpecific";
-			done;
-			#echo "$netblock,$lessSpecific_data,LessSpecific";
-		fi;
-	fi;
+                        if [[ $exact_data ]]
+                        then
+                                echo "$CIDR,$exact_data,Exact";
+                        fi;
+                        if [[ $moreSpecific_data ]]
+                        then
+                                for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
+                                        echo "$CIDR,${moreSpecific_data[$data]},MoreSpecific";
+                                done;
+                                #echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
+                        fi;
+                        if [[ $lessSpecific_data ]]
+                        then
+                                for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
+                                        echo "$CIDR,${lessSpecific_data[$data]},LessSpecific";
+                                done;
+                                #echo "$url,$CIDR,$lessSpecific_data,LessSpecific";
+                        fi;
+                done;
+        else
+                # Checks if the netblock is valid or not
+                if ! [[ $netblock =~ $cidr_regex ]]; then
+                        printf "${RED}[-]Error: The netblock provided is invalid.${NC}\n"
+
+                        exit 2;
+                fi;
+
+                ripedb=$(curl -sKL https://stat.ripe.net/data/address-space-hierarchy/data.json?resource=$netblock);
+
+                exact_data=$(echo $ripedb | jq -r '.data.exact[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv');
+                readarray -t moreSpecific_data <<< "$(echo $ripedb | jq -r '.data.more_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+                readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
+
+
+                if [[ $exact_data ]]
+                then
+                        echo "$netblock,$exact_data,Exact";
+                fi;
+                if [[ $moreSpecific_data ]]
+                then
+                        for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
+                                echo "$netblock,${moreSpecific_data[$data]},MoreSpecific";
+                        done;
+                        #echo "$netblock,$moreSpecific_data,MoreSpecific";
+                fi;
+                if [[ $lessSpecific_data ]]
+                then
+                        for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
+                                echo "$netblock,${lessSpecific_data[$data]},LessSpecific";
+                        done;
+                        #echo "$netblock,$lessSpecific_data,LessSpecific";
+                fi;
+        fi;
 }
 
-netname_url() {	
-	# Fetching all the CIDRs from the networksdb.io URL
-	readarray -t cidr_list <<< "$(curl -sk $url | grep -i cidr | grep -oE $cidr_regex)";
+netname_url() {
+        # Fetching all the CIDRs from the networksdb.io URL
+        readarray -t cidr_list <<< "$(curl -sk $url | grep -i cidr | grep -oE $cidr_regex)";
 
-	extract_ripedb_data_from_urls
+        extract_ripedb_data_from_urls
 }
 
 netname_netblock() {
-	extract_ripedb_data_from_netblocks
+        extract_ripedb_data_from_netblocks
 }
 
 netname_url_file(){
-	for each_url in `cat $file`; do
-		# Fetching all the CIDRs from the networksdb.io URL
-		readarray -t cidr_list <<< "$(curl -sk $url | grep -i cidr | grep -oE $cidr_regex)"
-	done;
-	
-	extract_ripedb_data_from_urls
+        for each_url in `cat $file`; do
+                # Fetching all the CIDRs from the networksdb.io URL
+                readarray -t cidr_list <<< "$(curl -sk $url | grep -i cidr | grep -oE $cidr_regex)"
+        done;
+
+        extract_ripedb_data_from_urls
 }
 
 netname_netblock_file(){
-	extract_ripedb_data_from_netblocks
+        extract_ripedb_data_from_netblocks
 }
 
 # Assigning variables for user input
@@ -170,7 +170,7 @@ else
     cli_arg=true
 fi
 
-if [ $cli_arg ]
+if $cli_arg
 then
     # To check if -h flag is provided
     if [[ $1 = '-h' ]]
@@ -185,7 +185,7 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -u${NC}\n\n"
                     else
-						url=$1
+                                                url=$1
                         netname_url
                     fi
                     ;;
@@ -194,7 +194,7 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -n${NC}\n\n"
                     else
-						netblock=$1
+                                                netblock=$1
                         netname_netblock
                     fi
                     ;;
@@ -203,7 +203,7 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -uf${NC}\n\n"
                     else
-						file=$1
+                                                file=$1
                         netname_url_file
                     fi
                     ;;
@@ -212,7 +212,7 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -nf${NC}\n\n"
                     else
-						file=$1
+                                                file=$1
                         netname_netblock_file
                     fi
                     ;;
