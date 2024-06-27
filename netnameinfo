@@ -1,6 +1,8 @@
 #!/bin/bash
 # Written by Nikhilesh Gupta, December 2023 [ Last Updated At : June 2024 ]
 
+# set -x
+
 # Define color codes
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
@@ -18,11 +20,15 @@ help_and_syntax_section() {
         printf "   -> ${CYAN}netnameinfo -n <Netblock>${NC}\n";
         printf "   -> ${CYAN}netnameinfo -uf <file.txt>${NC}\n";
         printf "   -> ${CYAN}netnameinfo -nf <file.txt>${NC}\n";
+        printf "${CYAN}   Optional Flags:${NC}\n"
+        #printf "     ${GREEN}-s${NC} # Specify if the enduser only wants the best data available ${MAGENTA}[Value of data: More Specific > Exact > Less Specific]${NC}\n"
+        printf "     ${GREEN}-s${NC} # To only fetch data which have more value ${MAGENTA}[Value of data: More Specific > Exact > Less Specific]${NC}\n"
         printf "${YELLOW}[#]Description:${NC} ${BLUE}The tool will gather CIDR ranges from networksdb.io URLs provided and fetch netname information using RIPE database and gives output in CSV format which needs to be saved either using redirection '>' or 'tee' command${NC}\n";
 		printf "${YELLOW}[#]Note:${NC} ${BLUE}The file should have the list of URLs from networksdb.io which contains CIDR ranges and seperated with next line. Use 'Organisation Lookup' feature in networksdb.io to find such URLs${NC}\n";
 		printf "${YELLOW}[#]Examples:${NC}\n";
 		printf "    -> ${CYAN}netnameinfo -u https://networksdb.io/ip-addresses-of/google-ltd${NC}\n";
 		printf "    -> ${CYAN}netnameinfo -n 192.168.1.0/24${NC}\n";
+		printf "    -> ${CYAN}netnameinfo -s -n 192.168.1.0/24${NC}\n";
 		printf "    -> ${CYAN}netnameinfo -uf file.txt${NC}             # File contains networksdb.io urls seperated by lines\n";
 		printf "    -> ${CYAN}netnameinfo -nf file.txt${NC}             # File contains netblocks seperated by lines\n";
         exit 0;
@@ -41,18 +47,26 @@ extract_ripedb_data_from_urls(){
                 readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
 
 
-                if [[ $exact_data ]]
-                then
-                        echo "$url,$CIDR,$exact_data,Exact";
-                fi;
                 if [[ $moreSpecific_data ]]
                 then
                         for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
                                 echo "$url,$CIDR,${moreSpecific_data[$data]},MoreSpecific";
                         done;
                         #echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
+
+                        if $specific_data_switch; then
+                                found_best_data=true
+                        fi
+                if [[ -n "$exact_data" && "$found_best_data" == false ]]
+                then
+                        echo "$url,$CIDR,$exact_data,Exact";
+
+                        if $specific_data_switch; then
+                                found_best_data=true
+                        fi
                 fi;
-                if [[ $lessSpecific_data ]]
+                fi;
+                if [[ -n "$lessSpecific_data" && "$found_best_data" == false ]]
                 then
                         for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
                                 echo "$url,$CIDR,${lessSpecific_data[$data]},LessSpecific";
@@ -76,18 +90,26 @@ extract_ripedb_data_from_netblocks(){
                         readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
 
 
-                        if [[ $exact_data ]]
-                        then
-                                echo "$CIDR,$exact_data,Exact";
-                        fi;
                         if [[ $moreSpecific_data ]]
                         then
                                 for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
                                         echo "$CIDR,${moreSpecific_data[$data]},MoreSpecific";
                                 done;
                                 #echo "$url,$CIDR,$moreSpecific_data,MoreSpecific";
+
+                                if $specific_data_switch; then
+                                        found_best_data=true
+                                fi
+                        if [[ -n "$exact_data" && "$found_best_data" == false ]]
+                        then
+                                echo "$CIDR,$exact_data,Exact";
+
+                                if $specific_data_switch; then
+                                        found_best_data=true
+                                fi
                         fi;
-                        if [[ $lessSpecific_data ]]
+                        fi;
+                        if [[ -n "$lessSpecific_data" && "$found_best_data" == false ]]
                         then
                                 for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
                                         echo "$CIDR,${lessSpecific_data[$data]},LessSpecific";
@@ -110,18 +132,26 @@ extract_ripedb_data_from_netblocks(){
                 readarray -t lessSpecific_data <<< "$(echo $ripedb | jq -r '.data.less_specific[] | [.inetnum, .netname, .country, .descr, .org, .remarks, ."mnt-by"] | @csv')";
 
 
-                if [[ $exact_data ]]
-                then
-                        echo "$netblock,$exact_data,Exact";
-                fi;
                 if [[ $moreSpecific_data ]]
                 then
                         for ((data=0; data<${#moreSpecific_data[@]}; data++)); do
                                 echo "$netblock,${moreSpecific_data[$data]},MoreSpecific";
                         done;
                         #echo "$netblock,$moreSpecific_data,MoreSpecific";
+
+                        if $specific_data_switch; then
+                                found_best_data=true
+                        fi
+                if [[ -n "$exact_data" && "$found_best_data" == false ]]
+                then
+                        echo "$netblock,$exact_data,Exact";
+
+                        if $specific_data_switch; then
+                                found_best_data=true
+                        fi
                 fi;
-                if [[ $lessSpecific_data ]]
+                fi;
+                if [[ -n "$lessSpecific_data" && "$found_best_data" == false ]]
                 then
                         for ((data=0; data<${#lessSpecific_data[@]}; data++)); do
                                 echo "$netblock,${lessSpecific_data[$data]},LessSpecific";
@@ -151,8 +181,14 @@ netname_url_file(){
         extract_ripedb_data_from_urls
 }
 
-netname_netblock_file(){
+netname_netblock_file() {
         extract_ripedb_data_from_netblocks
+}
+
+multiple_mandatory_flag_error() {
+        printf "${RED}[-]Error: Multiple flags provided, please refer to examples provided in help section${NC}\n\n"
+
+        exit 1
 }
 
 # Assigning variables for user input
@@ -161,7 +197,10 @@ netblock="" # takes netblock
 file="" # takes file which contains the data
 cidr_list="" # stores the list of CIDRs identified
 cidr_regex="(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/(3[0-2]|[12]?[0-9]))"
-# switch="" # to specify if the enduser is given input as urls or netblocks
+is_mandatory_flag_set=false # to check if the mandatory flag is provided by the user or not (expect '-s', using atleast any other flag is mandatory)
+specific_data_switch=false # a switch to specify if the end-user only wants the best data available
+flag="" # takes the mandatory flag specified by the end-user
+found_best_data=false # to check if the best data for the target is identified or not
 
 # Checking if no command-line arguments is provided
 if [[ -z $1 ]]; then
@@ -185,8 +224,13 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -u${NC}\n\n"
                     else
-                                                url=$1
-                        netname_url
+                        if $is_mandatory_flag_set
+                        then
+                                multiple_mandatory_flag_error
+                        fi
+                        url=$1
+                        is_mandatory_flag_set=true
+                        flag="u"
                     fi
                     ;;
                 -n)
@@ -194,8 +238,13 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -n${NC}\n\n"
                     else
-                                                netblock=$1
-                        netname_netblock
+                        if $is_mandatory_flag_set
+                        then
+                                multiple_mandatory_flag_error
+                        fi
+                        netblock=$1
+                        is_mandatory_flag_set=true
+                        flag="n"
                     fi
                     ;;
                 -uf)
@@ -203,8 +252,13 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -uf${NC}\n\n"
                     else
-                                                file=$1
-                        netname_url_file
+                        if $is_mandatory_flag_set
+                        then
+                                multiple_mandatory_flag_error
+                        fi
+                        file=$1
+                        is_mandatory_flag_set=true
+                        flag="uf"
                     fi
                     ;;
                 -nf)
@@ -212,9 +266,17 @@ then
                     if [[ -z "$1" ]]; then
                         printf "${RED}[-] Flag provided but not defined: -nf${NC}\n\n"
                     else
-                                                file=$1
-                        netname_netblock_file
+                        if $is_mandatory_flag_set
+                        then
+                                multiple_mandatory_flag_error
+                        fi
+                        file=$1
+                        is_mandatory_flag_set=true
+                        flag="nf"
                     fi
+                    ;;
+                -s)
+                    specific_data_switch=true
                     ;;
                 *)
                     printf "${RED}[-] Unknown flag or incorrect way to use the flag: $1${NC}\n\n"
@@ -222,6 +284,24 @@ then
             esac
             shift
         done
+
+        if ! $is_mandatory_flag_set
+        then
+                printf "${RED}[-]Error: Mandatory flag is not provided, please refer to examples provided in help section${NC}\n\n"
+                
+                exit 1
+        fi
+
+        # Calling the function corresponding to the queried flag
+        if [[ $flag = "n" ]]; then
+                netname_netblock
+        elif [[ $flag = "u" ]]; then
+                netname_url
+        elif [[ $flag = "nf" ]]; then
+                netname_netblock_file
+        elif [[ $flag = "uf" ]]; then
+                netname_url_file
+        fi
     fi;
 else
     # If no argument is provided
