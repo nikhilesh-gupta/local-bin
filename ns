@@ -10,12 +10,14 @@ CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
 
+# set -x 
 
 # Function contains HELP information related to the script
 help_and_syntax_section() {
         printf "${YELLOW}[+]Syntax for tool NS{NSLOOKUP-SWISS}:${NC}\n";
-        printf "   -> ${CYAN}ns <file.txt>${NC}\n";
-        printf "   -> ${CYAN}ns -v <file.txt>${NC}\n";
+        printf "   -> ${CYAN}ns -f <file.txt>${NC}   	# To output only the IPs\n";
+        printf "   -> ${CYAN}ns -v -f <file.txt>${NC}	# To output in verbose mode\n";
+        printf "   -> ${CYAN}ns -csv -f <file.txt>${NC}	# To output in CSV format\n";
         printf "${YELLOW}[#]Description:${NC} ${BLUE}The tool will find the IPs from the list of domain/subdomains. The verbose mode can be used to keep the evidence of attribution of IPs via saving the output${NC}\n";
         printf "${YELLOW}[#]Note:${NC} ${BLUE}The file should have the list of domains/subdomains seperated with next line${NC}\n";
 
@@ -24,7 +26,7 @@ help_and_syntax_section() {
 
 # Funtion to fetch the IPs from the file of subdomains in verbose
 nslookup_verbose() {
-        for subdomain in `cat $file`; do
+        for subdomain in $(cat $file); do
                 echo "Subdomain - $subdomain";
                 nslookup $subdomain;
                 echo " ";
@@ -36,10 +38,23 @@ nslookup_verbose() {
 	exit 0;
 }
 
+nslookup_csv() {
+        for subdomain in $(cat "$file"); do
+                addresses=$(nslookup "$subdomain" | awk '/^Address: / {print $2}')
+                if [ -z "$addresses" ]; then
+                        echo "$subdomain,No Record"
+                else
+                        for address in $addresses; do
+                                echo "$subdomain,$address"
+                        done
+                fi;
+        done;
+}
+
 # Funtion to fetch the IPs from the file of subdomains
 nslookup_short() {
         # Fetching IPs
-        for subdomain in `cat $file`; do
+        for subdomain in $(cat $file); do
                 nslookup $subdomain | grep "Address" | grep -v "#53" | cut -d " " -f 2;
         done
 }
@@ -53,33 +68,77 @@ check_file() {
         fi;
 }
 
-# Assigning variable(s) for user input
-file="" # takes file which contains the data
+
+# Assigning variables for user input
+
+file="" # contains list of subdomains/domains ('-f')
+is_verbose=false # to display information with more verbosity ('-v')
+is_csv_format=false # to display information in CSV format ('-csv')
+
+# Script variables
+
+is_mandatory_flag_set=0 # To check if either of the mandatory flag ('-f') is provided by the user or not
+
 
 # Checking if no command-line arguments is provided
-if [[ -z $1 ]]; then
+if [[ $# -eq 0 ]]; then
     cli_arg=false
 else
     cli_arg=true
 fi
 
+
 if $cli_arg
 then
-        # To check if -h flag is provided
-        if [[ $1 = '-h' ]]
-        then
-                help_and_syntax_section
-        elif [[ $1 = '-v' ]]
-        then
-                file=$2
-                check_file
-                nslookup_verbose
-        else
-                file=$1
-                check_file
-                nslookup_short
-        fi;
-else
-        # If no argument is provided
+    # To check if -h flag is provided
+    if [[ $1 = '-h' ]]
+    then
         help_and_syntax_section
+    else
+        # Looping through the command-line arguments to parse flags and their values
+        # Looping through the command-line arguments to parse flags and their values
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                -f)
+                    shift
+                    if [[ -z "$1" ]]; then
+                        printf "${RED}[-] Flag provided but not defined: -f${NC}\n\n"
+
+                    else
+                        file="$1"
+                        check_file
+                        is_mandatory_flag_set=1
+                    fi
+                    ;;
+                -v)
+                    is_verbose=true
+                    ;;
+                -csv)
+                    is_csv_format=true
+                    ;;
+                *)
+                    printf "${RED}[-] Unknown flag or incorrect way to use the flag: $1${NC}\n\n"
+                    ;;
+            esac
+            shift
+        done
+    fi;
+    # Checks if mandatory flags are properly set
+    if [[ $is_mandatory_flag_set -eq 0 ]]
+    then
+        help_and_syntax_section
+    fi;
+
+    # Running the script
+    if [ "$is_verbose" = true ]; then
+        nslookup_verbose
+    elif [ "$is_csv_format" = true ]; then
+        nslookup_csv
+    else
+        nslookup_short
+    fi;
+
+else
+    # If no argument is provided
+    help_and_syntax_section
 fi;
